@@ -7,7 +7,7 @@ from nltk.corpus import stopwords
 import gensim
 import gensim.corpora as corpora
 from gensim.utils import simple_preprocess
-from gensim.models import CoherenceModel
+from gensim.models import CoherenceModel, Phrases
 from pprint import pprint
 
 
@@ -63,18 +63,19 @@ def compute_coherence_values(corpus, dictionary, k, a, b):
     return coherence_model_lda.get_coherence()
 
 
-def get_topic_modeling_result(content):
+def get_topic_modeling_result(data_words, data_words_nostops):
+    global bigram_mod, trigram_mod
 
     # data = pd.read_csv('./dataset.csv')
     # data = data.drop(columns=['crt', 'title', 'published_date', 'authors', 'description', 'section', 'link'], axis=1)
     # Remove punctuation
-    content['data_text_processed'] = content.map(lambda x: re.sub('[,\.!?]', '', x))
+    # content['data_text_processed'] = content.map(lambda x: re.sub('[,\.!?]', '', x))
 
     # Convert the titles to lowercase
-    content['data_text_processed'] = content['data_text_processed'].map(lambda x: x.lower())
+    # content['data_text_processed'] = content['data_text_processed'].map(lambda x: x.lower())
 
-    data_list_of_sent = content.data_text_processed.values.tolist()
-    data_words = list(sent_to_words(data_list_of_sent))
+    # data_list_of_sent = content.data_text_processed.values.tolist()
+    # data_words = list(sent_to_words(data_list_of_sent))
 
     # Build the bigram and trigram models
     bigram = gensim.models.Phrases(data_words, min_count=5, threshold=100)
@@ -85,7 +86,7 @@ def get_topic_modeling_result(content):
     trigram_mod = gensim.models.phrases.Phraser(trigram)
 
     # Remove Stop Words
-    data_words_nostops = remove_stopwords(data_words)
+    # data_words_nostops = remove_stopwords(data_words)
 
     # Form Bigrams
     data_words_bigrams = make_bigrams(data_words_nostops)
