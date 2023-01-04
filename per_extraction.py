@@ -4,17 +4,18 @@ import spacy
 # python -m spacy download en_core_web_md --> to download the medium model (40 MB)
 
 
-ner = spacy.load("en_core_web_lg")
-file = open("all_person_names_lg_model.txt", "a", encoding="utf-8")
-
-news_df = pd.read_csv("dataset.csv")
-news_content = list(news_df["content"])
-
-for content in news_content:
+def get_person_names(content):
     labeled_content = ner(content)
+    person_names_by_text = []
     for word in labeled_content.ents:
-        # print(word.text, word.label_)
         if word.label_ == "PERSON":
-            file.write(word.text + ", ")
+            person_names_by_text.append(word.text)
+    return person_names_by_text
 
-file.close()
+
+if __name__ == '__main__':
+    ner = spacy.load("en_core_web_lg")
+    news_df = pd.read_csv("../../../PycharmProjects/person_extractor/dataset.csv")
+    news_content = list(news_df["content"])
+    for content in news_content:
+        print(get_person_names(content))
