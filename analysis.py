@@ -14,6 +14,11 @@ from gensim.models import CoherenceModel, Phrases
 from nltk.corpus import stopwords
 import spacy
 import gensim.corpora as corpora
+import person_extractor
+
+def init():
+    global ner
+    ner = spacy.load("en_core_web_lg")
 
 def init_spark():
     conf = SparkConf().setMaster("local").setAppName("News analyser")
@@ -64,7 +69,7 @@ def lemmatize_sentence(sentence, nlp):
 
 def add_text_topic(ds: DataFrame):
     # here we will add the implementation for subject finder
-    contents = ds.limit(100).rdd.map(lambda row: row['content']) \
+    contents = ds.rdd.map(lambda row: row['content']) \
         .map(lambda content: re.sub('[,\.!?]', '', content)) \
         .map(lambda content: content.lower()) \
         .map(lambda sentence: simple_preprocess(str(sentence), deacc=True)) \
@@ -94,7 +99,17 @@ def add_text_topic(ds: DataFrame):
 
     get_topic(corpus, id2word)
 
+def add_person_in_row(row: dict):
+    persons = person_extractor.get_person_names(row["content"], ner)
+    row["persons"] = persons
+    return row
+
+def add_persons(ds: DataFrame):
+    ds.rdd.map(lambda row: add_person_in_row(row.asDict())).foreach(lambda row: print(row["title"], row["persons"]))
+
 if __name__ == "__main__":
+    init()
     sc = init_spark()
-    ds = read_dataset(sc)
-    add_text_topic(ds)
+    ds = read_dataset(sc).limit(10).cache()
+    # add_text_topic(ds)
+    add_persons(ds)

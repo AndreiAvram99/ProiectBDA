@@ -4,13 +4,13 @@ import spacy
 # python -m spacy download en_core_web_md --> to download the medium model (40 MB)
 
 
-def get_person_names(content):
+def get_person_names(content, ner):
     labeled_content = ner(content)
     person_names_by_text = []
     for word in labeled_content.ents:
         if word.label_ == "PERSON":
             person_names_by_text.append(word.text)
-    return person_names_by_text
+    return list(set(person_names_by_text))
 
 
 if __name__ == '__main__':
