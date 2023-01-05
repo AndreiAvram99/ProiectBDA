@@ -12,6 +12,8 @@ import topic_extractor
 from gensim.utils import simple_preprocess
 from gensim.models import CoherenceModel, Phrases
 from nltk.corpus import stopwords
+import spacy
+import gensim.corpora as corpora
 
 def init_spark():
     conf = SparkConf().setMaster("local").setAppName("News analyser")
@@ -40,12 +42,29 @@ def read_dataset(sc: SQLContext):
 
     return ds
 
-def get_topic(data_words, data_words_nostops):
-    topic_extractor.get_topic_modeling_result(data_words, data_words_nostops)
+def get_topic(corpus, id2word):
+    topic_extractor.get_topic_modeling_result(corpus, id2word)
+
+
+import gensim.models
+def make_grams(data_words):
+    # Build the bigram and trigram models
+    bigram = gensim.models.Phrases(data_words, min_count=5, threshold=100)
+
+    # Faster way to get a sentence clubbed as a trigram/bigram
+    bigram_mod = gensim.models.phrases.Phraser(bigram)
+
+    return bigram_mod
+
+def lemmatize_sentence(sentence, nlp):
+    allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']
+    doc = nlp(" ".join(sentence))
+    return [token.lemma_ for token in doc if token.pos_ in allowed_postags]
+
 
 def add_text_topic(ds: DataFrame):
     # here we will add the implementation for subject finder
-    contents = ds.limit(10).rdd.map(lambda row: row['content']) \
+    contents = ds.limit(100).rdd.map(lambda row: row['content']) \
         .map(lambda content: re.sub('[,\.!?]', '', content)) \
         .map(lambda content: content.lower()) \
         .map(lambda sentence: simple_preprocess(str(sentence), deacc=True)) \
@@ -53,15 +72,27 @@ def add_text_topic(ds: DataFrame):
     
     data_words = list(contents.collect())
 
+    bigram_mod = make_grams(data_words)
+
     stop_words = stopwords.words('english')
     stop_words.extend(['from', 'subject', 're', 'told', 'make', 'edu', 'use',
                        'could', 'many', 'said', 'mr', 'bbc', 'also', 'ms', 'one',
                        'two', 'three', 'year', 'would', 'says', 'government',
                        'people', 'minister', 'may', 'need', 'see'])
 
-    data_words_nostops = list(contents.map(lambda sentence: [word for word in sentence if word not in stop_words]).collect())
+    nlp = spacy.load("en_core_web_sm", disable=['parser', 'ner'])
 
-    get_topic(data_words, data_words_nostops)
+    texts = contents.map(lambda sentence: [word for word in sentence if word not in stop_words]) \
+        .map(lambda sentence: bigram_mod[sentence]) \
+        .map(lambda sentence: lemmatize_sentence(sentence, nlp)) \
+        .cache()
+    
+    data_lemmatized = list(texts.collect())
+    id2word = corpora.Dictionary(data_lemmatized)
+
+    corpus = list(texts.map(lambda text: id2word.doc2bow(text)).collect())
+
+    get_topic(corpus, id2word)
 
 if __name__ == "__main__":
     sc = init_spark()
